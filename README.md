@@ -1,6 +1,8 @@
 # BharatExplore 🌏
 
-BharatExplore is a premium full-stack tourism discovery platform for India. It allows users to explore states, cities, and hidden gems with detailed historical context, cultural highlights, and AI-powered hotel recommendations.
+🚀 **Live Demo**: [https://bharatexplore.pages.dev/](https://bharatexplore.pages.dev/) (Hosted on Cloudflare Pages)
+
+BharatExplore is a premium full-stack tourism discovery platform for India. It allows users to explore states, cities, and hidden gems with detailed historical context, cultural highlights, and AI-powered recommendations.
 
 ## ✨ Features
 
@@ -50,7 +52,7 @@ GEMINI_API_KEY=your_gemini_api_key_here
 JWT_SECRET=your_random_secret_string
 NODE_ENV=development
 ```
-*Note: You can get a Gemini API key from [Google AI Studio](https://aistudio.google.com/).*
+*Note: You can get a Gemini API key from [Google AI Studio](https://aistudio.google.com/).* 
 
 ### 5. Run the Application
 Start the development server:
