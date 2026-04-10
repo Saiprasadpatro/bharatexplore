@@ -1,0 +1,22 @@
+# Node.js Dependencies (Managed via package.json)
+# To install: npm install
+
+@google/genai
+axios
+bcryptjs
+better-sqlite3
+dotenv
+express
+jsonwebtoken
+lucide-react
+motion
+react
+react-dom
+react-router-dom
+zustand
+
+# Build & Dev Tools
+vite
+tsx
+typescript
+tailwindcss

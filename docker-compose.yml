@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - JWT_SECRET=eyJraWQiOiJaTUtjVXciLCJhbGciOiJFUzI1NiJ9.eyJleHAiOjI1NTc5ODc2NTMsImlhdCI6MTc2OTU4NzY1MywibmJmIjoxNzY5NTg3NjUzLCJzdWIiOiJ7XCJ0b2tlblJlZklkXCI6XCJjYzFhM2JiYS1jMjIxLTQ0MzAtOTMyOS04MjlhNmExYzdiOWJcIixcInZlbmRvckludGVncmF0aW9uS2V5XCI6XCJlMzFmZjIzYjA4NmI0MDZjODg3NGIyZjZkODQ5NTMxM1wiLFwidXNlckFjY291bnRJZFwiOlwiZDU0OGRkZmYtYWIwMS00M2ExLWI2MzQtZTY3ODJhMjkxOGQzXCIsXCJkZXZpY2VJZFwiOlwiZWI1NDBkYWItNGYyYS01OWUxLTkyODItMjFmYTE5NjllNjRmXCIsXCJzZXNzaW9uSWRcIjpcIjliOTY2NTI0LWVjMTEtNGVjNy05YjNlLTEwYzhjMTc0MmY2MFwiLFwiYWRkaXRpb25hbERhdGFcIjpcIno1NC9NZzltdjE2WXdmb0gvS0EwYkRMNW5tRkd5R1B6cGl3N3pON2FWOEJSTkczdTlLa2pWZDNoWjU1ZStNZERhWXBOVi9UOUxIRmtQejFFQisybTdRPT1cIixcInJvbGVcIjpcImF1dGgtdG90cFwiLFwic291cmNlSXBBZGRyZXNzXCI6XCIxMDMuMTk5LjIwMC41NSwxMDQuMjMuMjE2Ljg1LDM1LjI0MS4yMy4xMjNcIixcInR3b0ZhRXhwaXJ5VHNcIjoyNTU3OTg3NjUzNjQxfSIsImlzcyI6ImFwZXgtYXV0aC1wcm9kLWFwcCJ9.bBquBPKlfxD1vRFPTYZRVoKy-lkmaNF8eUXTxr-f-uOx9f208dwob13M779koAMNWIqqDSnP27xU9ULXsrNDBg  
+      - GEMINI_API_KEY=AIzaSyCDUuKOnwdoCbULYyYFdfX3sBsN97l-ULA
+      - DB_PATH=/app/data/bharatexplore.db
+    volumes:
+      - ./data:/app/data
+    # Ensure the DB path in server.ts or db.ts points to /app/data if you want persistence
+    restart: always
