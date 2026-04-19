@@ -80,12 +80,29 @@ const DestinationSlider = () => {
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuthStore();
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-    }
+    const timer = setTimeout(() => {
+      if (!user) {
+        navigate('/login');
+      }
+      setIsLoading(false);
+    }, 200);
+
+    return () => clearTimeout(timer);
   }, [user, navigate]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen pt-32 flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-500 font-medium">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) return null;
   return <>{children}</>;
@@ -333,7 +350,7 @@ const LandingPage = () => {
 
   useEffect(() => {
     axios.get('/api/settings').then(res => {
-      setSettings(prev => ({...prev, ...res.data}));
+      setSettings((prev: any) => ({...prev, ...res.data}));
     });
   }, []);
 

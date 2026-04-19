@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 interface User {
+  is_admin: number;
   id: number;
   email: string;
   name: string;
