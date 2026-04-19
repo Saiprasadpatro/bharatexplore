@@ -55,8 +55,9 @@ app.post("/api/auth/register", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const stmt = db.prepare("INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)");
     const result = stmt.run(name, normalizedEmail, hashedPassword);
-    const token = jwt.sign({ id: result.lastInsertRowid, email: normalizedEmail, name, is_admin: 0 }, JWT_SECRET);
-    res.status(201).json({ token, user: { id: result.lastInsertRowid, email: normalizedEmail, name, is_admin: 0 } });
+    const userId = Number(result.lastInsertRowid);
+    const token = jwt.sign({ id: userId, email: normalizedEmail, name, is_admin: 0 }, JWT_SECRET);
+    res.status(201).json({ token, user: { id: userId, email: normalizedEmail, name, is_admin: 0 } });
   } catch (error: any) {
     console.error("Registration error:", error);
     if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
@@ -230,7 +231,7 @@ app.post("/api/admin/blogs", authenticateAdmin, (req: any, res) => {
   try {
     const stmt = db.prepare("INSERT INTO blogs (title, content, author_id, image_url, category, tags) VALUES (?, ?, ?, ?, ?, ?)");
     const result = stmt.run(title, content, req.user.id, image_url, category, tags);
-    res.status(201).json({ id: result.lastInsertRowid });
+    res.status(201).json({ id: Number(result.lastInsertRowid) });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
@@ -261,7 +262,7 @@ app.post("/api/admin/states", authenticateAdmin, (req, res) => {
   try {
     const stmt = db.prepare("INSERT INTO states (name, description, culture, cuisine, image_url) VALUES (?, ?, ?, ?, ?)");
     const result = stmt.run(name, description, culture, cuisine, image_url);
-    res.status(201).json({ id: result.lastInsertRowid });
+    res.status(201).json({ id: Number(result.lastInsertRowid) });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
@@ -292,7 +293,7 @@ app.post("/api/admin/places", authenticateAdmin, (req, res) => {
   try {
     const stmt = db.prepare("INSERT INTO places (state_id, name, description, history, best_time, latitude, longitude, image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     const result = stmt.run(state_id, name, description, history, best_time, latitude, longitude, image_url);
-    res.status(201).json({ id: result.lastInsertRowid });
+    res.status(201).json({ id: Number(result.lastInsertRowid) });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
@@ -318,6 +319,25 @@ app.delete("/api/admin/places/:id", authenticateAdmin, (req, res) => {
   }
 });
 
+// Admin stats - Move outside VERCEL check to ensure it works on Vercel
+app.get("/api/admin/stats", authenticateAdmin, (req, res) => {
+  try {
+    const states = db.prepare("SELECT COUNT(*) as count FROM states").get() as any;
+    const places = db.prepare("SELECT COUNT(*) as count FROM places").get() as any;
+    const blogs = db.prepare("SELECT COUNT(*) as count FROM blogs").get() as any;
+    const users = db.prepare("SELECT COUNT(*) as count FROM users").get() as any;
+    res.json({
+      states: states?.count || 0,
+      places: places?.count || 0,
+      blogs: blogs?.count || 0,
+      users: users?.count || 0
+    });
+  } catch (error) {
+    console.error("Stats error:", error);
+    res.status(500).json({ error: "Failed to fetch stats" });
+  }
+});
+
 // Vite middleware for development
 if (process.env.NODE_ENV !== "production") {
   const vite = await createViteServer({
@@ -336,20 +356,7 @@ if (process.env.NODE_ENV !== "production") {
 
 // Start server if not on Vercel
 if (process.env.VERCEL !== "1") {
-  app.get("/api/admin/stats", authenticateAdmin, (req, res) => {
-  const states = db.prepare("SELECT COUNT(*) as count FROM states").get() as any;
-  const places = db.prepare("SELECT COUNT(*) as count FROM places").get() as any;
-  const blogs = db.prepare("SELECT COUNT(*) as count FROM blogs").get() as any;
-  const users = db.prepare("SELECT COUNT(*) as count FROM users").get() as any;
-  res.json({
-    states: states.count,
-    places: places.count,
-    blogs: blogs.count,
-    users: users.count
-  });
-});
-
-app.listen(PORT, "0.0.0.0", () => {
+  app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }
