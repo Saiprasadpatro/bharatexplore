@@ -32,6 +32,13 @@ const authenticateToken = (req: any, res: any, next: any) => {
   });
 };
 
+const authenticateAdmin = (req: any, res: any, next: any) => {
+  authenticateToken(req, res, () => {
+    if (!req.user.is_admin) return res.status(403).json({ error: "Admin access required" });
+    next();
+  });
+};
+
 // --- API Routes ---
 
 // Auth
@@ -48,8 +55,8 @@ app.post("/api/auth/register", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const stmt = db.prepare("INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)");
     const result = stmt.run(name, normalizedEmail, hashedPassword);
-    const token = jwt.sign({ id: result.lastInsertRowid, email: normalizedEmail, name }, JWT_SECRET);
-    res.status(201).json({ token, user: { id: result.lastInsertRowid, email: normalizedEmail, name } });
+    const token = jwt.sign({ id: result.lastInsertRowid, email: normalizedEmail, name, is_admin: 0 }, JWT_SECRET);
+    res.status(201).json({ token, user: { id: result.lastInsertRowid, email: normalizedEmail, name, is_admin: 0 } });
   } catch (error: any) {
     console.error("Registration error:", error);
     if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
@@ -83,8 +90,8 @@ app.post("/api/auth/login", async (req, res) => {
       return res.status(400).json({ error: "Incorrect password. Please try again." });
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email, name: user.name }, JWT_SECRET);
-    res.json({ token, user: { id: user.id, email: user.email, name: user.name } });
+    const token = jwt.sign({ id: user.id, email: user.email, name: user.name, is_admin: user.is_admin }, JWT_SECRET);
+    res.json({ token, user: { id: user.id, email: user.email, name: user.name, is_admin: user.is_admin } });
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({ error: "Internal server error" });
@@ -142,6 +149,38 @@ app.get("/api/favorites", authenticateToken, (req: any, res) => {
   res.json(favorites);
 });
 
+// Settings
+app.get("/api/settings", (req, res) => {
+  const settings = db.prepare("SELECT key, value FROM settings").all() as { key: string, value: string }[];
+  const settingsObj = settings.reduce((acc: any, curr) => {
+    acc[curr.key] = curr.value;
+    return acc;
+  }, {});
+  res.json(settingsObj);
+});
+
+// Blogs
+app.get("/api/blogs", (req, res) => {
+  const blogs = db.prepare(`
+    SELECT blogs.*, users.name as author_name 
+    FROM blogs 
+    JOIN users ON blogs.author_id = users.id 
+    ORDER BY created_at DESC
+  `).all();
+  res.json(blogs);
+});
+
+app.get("/api/blogs/:id", (req, res) => {
+  const blog = db.prepare(`
+    SELECT blogs.*, users.name as author_name 
+    FROM blogs 
+    JOIN users ON blogs.author_id = users.id 
+    WHERE blogs.id = ?
+  `).get(req.params.id);
+  if (!blog) return res.status(404).json({ error: "Blog not found" });
+  res.json(blog);
+});
+
 app.post("/api/favorites", authenticateToken, (req: any, res) => {
   const { placeId } = req.body;
   try {
@@ -159,6 +198,124 @@ app.post("/api/favorites", authenticateToken, (req: any, res) => {
 app.delete("/api/favorites/:placeId", authenticateToken, (req: any, res) => {
   db.prepare("DELETE FROM favorites WHERE user_id = ? AND place_id = ?").run(req.user.id, req.params.placeId);
   res.json({ message: "Removed from favorites" });
+});
+
+app.get("/api/admin/all-places", authenticateAdmin, (req, res) => {
+  const places = db.prepare(`
+    SELECT places.*, states.name as state_name 
+    FROM places 
+    JOIN states ON places.state_id = states.id
+  `).all();
+  res.json(places);
+});
+
+// Admin Routes
+app.get("/api/admin/settings", authenticateAdmin, (req, res) => {
+  const settings = db.prepare("SELECT * FROM settings").all();
+  res.json(settings);
+});
+
+app.put("/api/admin/settings", authenticateAdmin, (req, res) => {
+  const { key, value } = req.body;
+  try {
+    db.prepare("UPDATE settings SET value = ? WHERE key = ?").run(value, key);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/admin/blogs", authenticateAdmin, (req: any, res) => {
+  const { title, content, image_url, category, tags } = req.body;
+  try {
+    const stmt = db.prepare("INSERT INTO blogs (title, content, author_id, image_url, category, tags) VALUES (?, ?, ?, ?, ?, ?)");
+    const result = stmt.run(title, content, req.user.id, image_url, category, tags);
+    res.status(201).json({ id: result.lastInsertRowid });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put("/api/admin/blogs/:id", authenticateAdmin, (req, res) => {
+  const { title, content, image_url, category, tags } = req.body;
+  try {
+    db.prepare("UPDATE blogs SET title = ?, content = ?, image_url = ?, category = ?, tags = ? WHERE id = ?")
+      .run(title, content, image_url, category, tags, req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete("/api/admin/blogs/:id", authenticateAdmin, (req, res) => {
+  try {
+    db.prepare("DELETE FROM blogs WHERE id = ?").run(req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/admin/states", authenticateAdmin, (req, res) => {
+  const { name, description, culture, cuisine, image_url } = req.body;
+  try {
+    const stmt = db.prepare("INSERT INTO states (name, description, culture, cuisine, image_url) VALUES (?, ?, ?, ?, ?)");
+    const result = stmt.run(name, description, culture, cuisine, image_url);
+    res.status(201).json({ id: result.lastInsertRowid });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put("/api/admin/states/:id", authenticateAdmin, (req, res) => {
+  const { name, description, culture, cuisine, image_url } = req.body;
+  try {
+    db.prepare("UPDATE states SET name = ?, description = ?, culture = ?, cuisine = ?, image_url = ? WHERE id = ?")
+      .run(name, description, culture, cuisine, image_url, req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete("/api/admin/states/:id", authenticateAdmin, (req, res) => {
+  try {
+    db.prepare("DELETE FROM states WHERE id = ?").run(req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/admin/places", authenticateAdmin, (req, res) => {
+  const { state_id, name, description, history, best_time, latitude, longitude, image_url } = req.body;
+  try {
+    const stmt = db.prepare("INSERT INTO places (state_id, name, description, history, best_time, latitude, longitude, image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    const result = stmt.run(state_id, name, description, history, best_time, latitude, longitude, image_url);
+    res.status(201).json({ id: result.lastInsertRowid });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put("/api/admin/places/:id", authenticateAdmin, (req, res) => {
+  const { state_id, name, description, history, best_time, latitude, longitude, image_url } = req.body;
+  try {
+    db.prepare("UPDATE places SET state_id = ?, name = ?, description = ?, history = ?, best_time = ?, latitude = ?, longitude = ?, image_url = ? WHERE id = ?")
+      .run(state_id, name, description, history, best_time, latitude, longitude, image_url, req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete("/api/admin/places/:id", authenticateAdmin, (req, res) => {
+  try {
+    db.prepare("DELETE FROM places WHERE id = ?").run(req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
 });
 
 // Vite middleware for development
@@ -179,7 +336,20 @@ if (process.env.NODE_ENV !== "production") {
 
 // Start server if not on Vercel
 if (process.env.VERCEL !== "1") {
-  app.listen(PORT, "0.0.0.0", () => {
+  app.get("/api/admin/stats", authenticateAdmin, (req, res) => {
+  const states = db.prepare("SELECT COUNT(*) as count FROM states").get() as any;
+  const places = db.prepare("SELECT COUNT(*) as count FROM places").get() as any;
+  const blogs = db.prepare("SELECT COUNT(*) as count FROM blogs").get() as any;
+  const users = db.prepare("SELECT COUNT(*) as count FROM users").get() as any;
+  res.json({
+    states: states.count,
+    places: places.count,
+    blogs: blogs.count,
+    users: users.count
+  });
+});
+
+app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation, useParams, BrowserRouter } from 'react-router-dom';
-import { Search, MapPin, Heart, User, LogOut, Menu, X, ChevronRight, Star, Calendar, Info, Mail, Linkedin, MessageCircle } from 'lucide-react';
+import { Search, MapPin, Heart, User, LogOut, Menu, X, ChevronRight, Star, Calendar, Info, Mail, Linkedin, MessageCircle, Plus, Trash2, Edit, Save, PlusCircle, LayoutDashboard, Settings, FileText, Image as ImageIcon, Users, BarChart3, Globe, PenTool } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import axios from 'axios';
 import { useAuthStore } from './store/authStore';
@@ -91,10 +91,31 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const AdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useAuthStore();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!user || user.is_admin !== 1) {
+      navigate('/');
+    }
+  }, [user, navigate]);
+
+  if (!user || user.is_admin !== 1) return null;
+  return <>{children}</>;
+};
+
 const Navbar = () => {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [siteName, setSiteName] = useState('BharatExplore');
+
+  useEffect(() => {
+    axios.get('/api/settings').then(res => {
+      if (res.data.site_name) setSiteName(res.data.site_name);
+    });
+  }, []);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
@@ -105,7 +126,7 @@ const Navbar = () => {
               <MapPin className="text-white w-5 h-5" />
             </div>
             <span className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-              BharatExplore
+              {siteName}
             </span>
           </Link>
 
@@ -116,6 +137,12 @@ const Navbar = () => {
                 <Link to="/explore" className="text-gray-600 hover:text-emerald-600 font-medium transition-colors">Explore</Link>
                 <Link to="/states" className="text-gray-600 hover:text-emerald-600 font-medium transition-colors">States</Link>
                 <Link to="/dashboard" className="text-gray-600 hover:text-emerald-600 font-medium transition-colors">Dashboard</Link>
+                {user.is_admin === 1 && (
+                  <Link to="/admin" className="text-emerald-600 hover:text-emerald-700 font-bold flex items-center space-x-1">
+                    <Settings className="w-4 h-4" />
+                    <span>Admin</span>
+                  </Link>
+                )}
                 <div className="flex items-center space-x-4 pl-4 border-l border-gray-200">
                   <span className="text-sm text-gray-500">Hi, {user.name}</span>
                   <button onClick={logout} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
@@ -154,6 +181,9 @@ const Navbar = () => {
                 <Link to="/explore" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>Explore</Link>
                 <Link to="/states" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>States</Link>
                 <Link to="/dashboard" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>Dashboard</Link>
+                {user.is_admin === 1 && (
+                  <Link to="/admin" className="block text-emerald-600 font-bold" onClick={() => setIsMenuOpen(false)}>Admin Panel</Link>
+                )}
                 <button onClick={() => { logout(); setIsMenuOpen(false); }} className="block text-red-500 font-medium">Logout</button>
               </>
             ) : (
@@ -295,6 +325,17 @@ const SearchBar = () => {
 const LandingPage = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const [settings, setSettings] = useState<any>({
+    hero_title: 'INCREDIBLE India',
+    hero_subtitle: 'Beyond the destinations, it\'s a feeling. A journey through ancient wisdom, vibrant colors, and the timeless spirit of a nation.',
+    hero_image: 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?q=80&w=2071&auto=format&fit=crop'
+  });
+
+  useEffect(() => {
+    axios.get('/api/settings').then(res => {
+      setSettings(prev => ({...prev, ...res.data}));
+    });
+  }, []);
 
   const handleExploreClick = () => {
     if (user) {
@@ -317,8 +358,8 @@ const LandingPage = () => {
             className="w-full h-full"
           >
             <img 
-              src="https://images.unsplash.com/photo-1524492412937-b28074a5d7da?q=80&w=2071&auto=format&fit=crop" 
-              alt="Taj Mahal" 
+              src={settings.hero_image} 
+              alt="Hero Background" 
               className="w-full h-full object-cover"
               referrerPolicy="no-referrer"
             />
@@ -345,13 +386,15 @@ const LandingPage = () => {
               </div>
               
               <h1 className="text-7xl md:text-9xl lg:text-[10rem] font-bold text-white leading-[0.85] tracking-tighter mb-10">
-                INCREDIBLE <br />
-                <span className="font-serif italic font-normal text-emerald-400">India</span>
+                {settings.hero_title.split(' ')[0]} <br />
+                <span className="font-serif italic font-normal text-emerald-400">
+                  {settings.hero_title.split(' ').slice(1).join(' ')}
+                </span>
               </h1>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-end">
                 <p className="text-xl md:text-2xl text-gray-300 font-light leading-relaxed">
-                  Beyond the destinations, it's a feeling. A journey through ancient wisdom, vibrant colors, and the timeless spirit of a nation.
+                  {settings.hero_subtitle}
                 </p>
                 
                 <div className="flex flex-col sm:flex-row gap-6">
@@ -1211,25 +1254,371 @@ const StatesPage = () => {
   );
 };
 
+const AdminDashboard = () => {
+  const [activeTab, setActiveTab] = useState<'stats' | 'states' | 'places' | 'blogs' | 'settings'>('stats');
+  const [states, setStates] = useState<any[]>([]);
+  const [places, setPlaces] = useState<any[]>([]);
+  const [blogs, setBlogs] = useState<any[]>([]);
+  const [settings, setSettings] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>({});
+  const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<any>(null);
+  const [editForm, setEditForm] = useState<any>({});
+  const { token } = useAuthStore();
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const [statesRes, placesRes, blogsRes, settingsRes, statsRes] = await Promise.all([
+        axios.get('/api/states'),
+        axios.get('/api/admin/all-places', { headers }),
+        axios.get('/api/blogs'),
+        axios.get('/api/admin/settings', { headers }),
+        axios.get('/api/admin/stats', { headers })
+      ]);
+      setStates(statesRes.data);
+      setPlaces(placesRes.data);
+      setBlogs(blogsRes.data);
+      setSettings(settingsRes.data);
+      setStats(statsRes.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleEdit = (item: any) => {
+    setEditingId(item.id || item.key);
+    setEditForm(item);
+  };
+
+  const handleAction = async (method: 'post' | 'put' | 'delete', endpoint: string, data?: any) => {
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      if (method === 'delete') {
+        await axios.delete(endpoint, { headers });
+      } else if (method === 'put') {
+        await axios.put(endpoint, data, { headers });
+      } else {
+        await axios.post(endpoint, data, { headers });
+      }
+      setEditingId(null);
+      fetchData();
+    } catch (err) {
+      alert("Error performing action");
+    }
+  };
+
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-900 border-l border-white/5">
+      <div className="flex flex-col items-center space-y-4">
+        <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-gray-400 font-medium animate-pulse">Initializing Control Center...</p>
+      </div>
+    </div>
+  );
+
+  const Sidebar = () => (
+    <div className="w-64 bg-gray-900 h-screen fixed left-0 top-0 border-r border-white/5 flex flex-col p-6 z-[60]">
+      <div className="flex items-center space-x-3 mb-12">
+        <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-900/40">
+          <Settings className="text-white w-6 h-6" />
+        </div>
+        <span className="text-xl font-black text-white tracking-tighter">ADMIN CORE</span>
+      </div>
+
+      <nav className="flex-1 space-y-2">
+        <button onClick={() => setActiveTab('stats')} className={cn("w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all", activeTab === 'stats' ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/20" : "text-gray-400 hover:bg-white/5 hover:text-white")}>
+          <BarChart3 className="w-5 h-5" />
+          <span className="font-semibold">Dashboard</span>
+        </button>
+        <button onClick={() => setActiveTab('states')} className={cn("w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all", activeTab === 'states' ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/20" : "text-gray-400 hover:bg-white/5 hover:text-white")}>
+          <Globe className="w-5 h-5" />
+          <span className="font-semibold">States</span>
+        </button>
+        <button onClick={() => setActiveTab('places')} className={cn("w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all", activeTab === 'places' ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/20" : "text-gray-400 hover:bg-white/5 hover:text-white")}>
+          <MapPin className="w-5 h-5" />
+          <span className="font-semibold">Places</span>
+        </button>
+        <button onClick={() => setActiveTab('blogs')} className={cn("w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all", activeTab === 'blogs' ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/20" : "text-gray-400 hover:bg-white/5 hover:text-white")}>
+          <PenTool className="w-5 h-5" />
+          <span className="font-semibold">Blogs</span>
+        </button>
+        <button onClick={() => setActiveTab('settings')} className={cn("w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all", activeTab === 'settings' ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/20" : "text-gray-400 hover:bg-white/5 hover:text-white")}>
+          <Settings className="w-5 h-5" />
+          <span className="font-semibold">Settings</span>
+        </button>
+      </nav>
+
+      <div className="pt-6 border-t border-white/5">
+        <Link to="/" className="flex items-center space-x-3 px-4 py-3 text-gray-400 hover:text-white transition-colors">
+          <ChevronRight className="w-5 h-5 rotate-180" />
+          <span className="text-sm font-medium">Back to Site</span>
+        </Link>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="bg-gray-950 min-h-screen text-gray-100 flex">
+      <Sidebar />
+      <div className="flex-1 ml-64 p-10">
+        <header className="mb-12">
+          <h2 className="text-xs font-bold text-emerald-500 uppercase tracking-[0.4em] mb-3">System Control</h2>
+          <h1 className="text-4xl font-black tracking-tight flex items-center space-x-4">
+            <span>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</span>
+            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+          </h1>
+        </header>
+
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          {activeTab === 'stats' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[
+                { label: 'States', count: stats.states, icon: Globe, color: 'text-blue-400' },
+                { label: 'Places', count: stats.places, icon: MapPin, color: 'text-emerald-400' },
+                { label: 'Blogs', count: stats.blogs, icon: PenTool, color: 'text-amber-400' },
+                { label: 'Users', count: stats.users, icon: Users, color: 'text-purple-400' },
+              ].map((item, i) => (
+                <div key={i} className="bg-white/5 border border-white/10 p-8 rounded-[2rem] hover:bg-white/[0.07] transition-all group">
+                  <div className="flex justify-between items-start mb-6">
+                    <div className={cn("p-4 rounded-2xl bg-white/5", item.color)}>
+                      <item.icon className="w-6 h-6" />
+                    </div>
+                    <span className="text-xs font-bold text-emerald-500 uppercase tracking-widest">Active</span>
+                  </div>
+                  <div className="text-4xl font-black mb-1 tracking-tighter">{item.count}</div>
+                  <div className="text-gray-500 font-medium">{item.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activeTab === 'states' && (
+            <div className="bg-white/5 border border-white/10 rounded-[2.5rem] overflow-hidden">
+              <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+                <h3 className="text-xl font-bold">State Inventory</h3>
+                <button onClick={() => { setEditingId(-1); setEditForm({ name: '', description: '', culture: '', cuisine: '', image_url: '' }); }} className="bg-emerald-600 hover:bg-emerald-500 px-6 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-emerald-900/40 flex items-center space-x-2 text-sm">
+                  <Plus className="w-4 h-4" />
+                  <span>Create State</span>
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="text-[10px] uppercase tracking-[0.2em] font-black text-gray-500 border-b border-white/5">
+                      <th className="px-8 py-4">Identity</th>
+                      <th className="px-8 py-4">Visual</th>
+                      <th className="px-8 py-4">Details</th>
+                      <th className="px-8 py-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {editingId === -1 && (
+                      <tr className="bg-emerald-500/5">
+                        <td className="px-8 py-6"><input className="bg-white/5 border border-white/10 rounded-lg p-2 w-full text-sm focus:outline-emerald-500" placeholder="State Name" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} /></td>
+                        <td className="px-8 py-6"><input className="bg-white/5 border border-white/10 rounded-lg p-2 w-full text-sm focus:outline-emerald-500" placeholder="Image URL" value={editForm.image_url} onChange={e => setEditForm({...editForm, image_url: e.target.value})} /></td>
+                        <td className="px-8 py-6"><textarea className="bg-white/5 border border-white/10 rounded-lg p-2 w-full text-sm focus:outline-emerald-500" placeholder="Description" value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} /></td>
+                        <td className="px-8 py-6 text-right space-x-2">
+                          <button onClick={() => handleAction('post', '/api/admin/states', editForm)} className="p-2 text-emerald-500 hover:bg-emerald-500/20 rounded-lg transition-all"><Save className="w-5 h-5" /></button>
+                          <button onClick={() => setEditingId(null)} className="p-2 text-red-400 hover:bg-red-400/20 rounded-lg transition-all"><X className="w-5 h-5" /></button>
+                        </td>
+                      </tr>
+                    )}
+                    {states.map(state => (
+                      <tr key={state.id} className="hover:bg-white/[0.02] transition-colors group">
+                        <td className="px-8 py-6">
+                          {editingId === state.id ? (
+                            <input className="bg-white/5 border border-white/10 rounded-lg p-2 w-full text-sm font-semibold" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} />
+                          ) : (
+                            <div className="font-bold text-lg">{state.name}</div>
+                          )}
+                        </td>
+                        <td className="px-8 py-6">
+                          {editingId === state.id ? (
+                            <input className="bg-white/5 border border-white/10 rounded-lg p-2 w-full text-sm" value={editForm.image_url} onChange={e => setEditForm({...editForm, image_url: e.target.value})} />
+                          ) : (
+                            <img src={state.image_url} className="w-16 h-10 object-cover rounded-lg border border-white/10 shadow-sm" alt="" referrerPolicy="no-referrer" />
+                          )}
+                        </td>
+                        <td className="px-8 py-6">
+                           {editingId === state.id ? (
+                            <textarea className="bg-white/5 border border-white/10 rounded-lg p-2 w-full text-sm" value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} />
+                          ) : (
+                            <div className="text-gray-500 text-sm line-clamp-1 max-w-sm">{state.description}</div>
+                          )}
+                        </td>
+                        <td className="px-8 py-6 text-right space-x-1 opacity-20 group-hover:opacity-100 transition-opacity">
+                          {editingId === state.id ? (
+                            <>
+                              <button onClick={() => handleAction('put', `/api/admin/states/${state.id}`, editForm)} className="p-2 text-emerald-500 hover:bg-emerald-500/20 rounded-lg transition-all"><Save className="w-5 h-5" /></button>
+                              <button onClick={() => setEditingId(null)} className="p-2 text-red-400 hover:bg-red-400/20 rounded-lg transition-all"><X className="w-5 h-5" /></button>
+                            </>
+                          ) : (
+                            <>
+                              <button onClick={() => handleEdit(state)} className="p-2 text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-all"><Edit className="w-4 h-4" /></button>
+                              <button onClick={() => handleAction('delete', `/api/admin/states/${state.id}`)} className="p-2 text-rose-400 hover:bg-rose-400/10 rounded-lg transition-all"><Trash2 className="w-4 h-4" /></button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'blogs' && (
+            <div className="bg-white/5 border border-white/10 rounded-[2.5rem] overflow-hidden">
+              <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+                <h3 className="text-xl font-bold">Article Management</h3>
+                <button onClick={() => { setEditingId(-2); setEditForm({ title: '', content: '', image_url: '', category: 'Adventure', tags: '' }); }} className="bg-emerald-600 hover:bg-emerald-500 px-6 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-emerald-900/40 flex items-center space-x-2 text-sm">
+                  <Plus className="w-4 h-4" />
+                  <span>New Post</span>
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 p-8 gap-6">
+                {(editingId === -2 || (typeof editingId === 'number' && blogs.find(b => b.id === editingId))) && (
+                   <div className="col-span-full bg-white/5 p-8 rounded-3xl border border-white/10 mb-8">
+                     <div className="grid grid-cols-2 gap-6 mb-6">
+                        <div className="space-y-2">
+                           <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Post Title</label>
+                           <input className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-emerald-500 transition-all" value={editForm.title} onChange={e => setEditForm({...editForm, title: e.target.value})} />
+                        </div>
+                        <div className="space-y-2">
+                           <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Banner Image URL</label>
+                           <input className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-emerald-500 transition-all" value={editForm.image_url} onChange={e => setEditForm({...editForm, image_url: e.target.value})} />
+                        </div>
+                     </div>
+                     <div className="space-y-2 mb-6">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Article Content</label>
+                        <textarea rows={6} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-emerald-500 transition-all" value={editForm.content} onChange={e => setEditForm({...editForm, content: e.target.value})} />
+                     </div>
+                     <div className="flex justify-end space-x-3">
+                        <button onClick={() => setEditingId(null)} className="px-6 py-2.5 font-bold text-gray-400 hover:text-white transition-colors">Discard</button>
+                        <button onClick={() => handleAction(editingId === -2 ? 'post' : 'put', editingId === -2 ? '/api/admin/blogs' : `/api/admin/blogs/${editingId}`, editForm)} className="bg-emerald-600 hover:bg-emerald-500 px-8 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-emerald-900/40">Publish Article</button>
+                     </div>
+                   </div>
+                )}
+                
+                {blogs.map(blog => (
+                  <div key={blog.id} className="bg-white/5 border border-white/10 rounded-3xl p-6 flex space-x-6 hover:bg-white/[0.07] transition-all group relative">
+                    <img src={blog.image_url} className="w-32 h-32 object-cover rounded-2xl border border-white/10" alt="" referrerPolicy="no-referrer" />
+                    <div className="flex-1">
+                      <div className="flex justify-between">
+                        <span className="text-emerald-500 text-[10px] font-black uppercase tracking-widest mb-2">{blog.category}</span>
+                        <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                           <button onClick={() => handleEdit(blog)} className="p-2 hover:text-emerald-400 transition-colors"><Edit className="w-4 h-4" /></button>
+                           <button onClick={() => handleAction('delete', `/api/admin/blogs/${blog.id}`)} className="p-2 hover:text-rose-400 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                      </div>
+                      <h4 className="font-bold text-lg mb-2 line-clamp-1">{blog.title}</h4>
+                      <p className="text-gray-500 text-sm line-clamp-2 italic mb-4">"{blog.content.substring(0, 80)}..."</p>
+                      <div className="flex items-center text-xs text-gray-600 space-x-3 italic">
+                        <span>by {blog.author_name}</span>
+                        <span>•</span>
+                        <span>{new Date(blog.created_at).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'settings' && (
+            <div className="bg-white/5 border border-white/10 rounded-[2.5rem] overflow-hidden p-8">
+               <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                  <div className="space-y-8">
+                     <h3 className="text-xl font-black tracking-tight flex items-center space-x-3 mb-8">
+                        <Globe className="w-6 h-6 text-emerald-500" />
+                        <span>Visual Configuration</span>
+                     </h3>
+                     {settings.filter(s => s.type !== 'textarea').map(setting => (
+                       <div key={setting.key} className="space-y-2">
+                          <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">{setting.label}</label>
+                          <div className="flex space-x-3">
+                             <input className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-emerald-500 transition-all text-sm" value={setting.value} onChange={e => {
+                               const updated = settings.map(s => s.key === setting.key ? {...s, value: e.target.value} : s);
+                               setSettings(updated);
+                             }} />
+                             <button onClick={() => handleAction('put', '/api/admin/settings', { key: setting.key, value: setting.value })} className="p-3 bg-white/5 hover:bg-emerald-600 transition-all rounded-xl border border-white/10 hover:text-white"><Save className="w-5 h-5" /></button>
+                          </div>
+                       </div>
+                     ))}
+                  </div>
+                  <div className="space-y-8">
+                     <h3 className="text-xl font-black tracking-tight flex items-center space-x-3 mb-8">
+                        <FileText className="w-6 h-6 text-emerald-500" />
+                        <span>Content & Metadata</span>
+                     </h3>
+                     {settings.filter(s => s.type === 'textarea').map(setting => (
+                       <div key={setting.key} className="space-y-2">
+                          <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">{setting.label}</label>
+                          <div className="relative group">
+                             <textarea rows={3} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-emerald-500 transition-all text-sm" value={setting.value} onChange={e => {
+                               const updated = settings.map(s => s.key === setting.key ? {...s, value: e.target.value} : s);
+                               setSettings(updated);
+                             }} />
+                             <button onClick={() => handleAction('put', '/api/admin/settings', { key: setting.key, value: setting.value })} className="absolute top-2 right-2 p-2 bg-emerald-600/20 hover:bg-emerald-600 transition-all rounded-lg text-emerald-500 hover:text-white"><Save className="w-4 h-4" /></button>
+                          </div>
+                       </div>
+                     ))}
+                  </div>
+               </div>
+            </div>
+          )}
+        </motion.div>
+      </div>
+    </div>
+  );
+};
+
+const MainLayout = ({ children }: { children: React.ReactNode }) => {
+  const location = useLocation();
+  const isAdminPath = location.pathname.startsWith('/admin');
+
+  if (isAdminPath) return <>{children}</>;
+
+  return (
+    <div className="min-h-screen bg-white font-sans text-gray-900">
+      <Navbar />
+      <main>
+        {children}
+      </main>
+      <Footer />
+    </div>
+  );
+};
+
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-white font-sans text-gray-900">
-        <Navbar />
-        <main>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/explore" element={<ProtectedRoute><ExplorePage /></ProtectedRoute>} />
-            <Route path="/login" element={<AuthPage type="login" />} />
-            <Route path="/register" element={<AuthPage type="register" />} />
-            <Route path="/state/:id" element={<ProtectedRoute><StatePage /></ProtectedRoute>} />
-            <Route path="/place/:id" element={<ProtectedRoute><PlacePage /></ProtectedRoute>} />
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/states" element={<ProtectedRoute><StatesPage /></ProtectedRoute>} />
-          </Routes>
-        </main>
-        <Footer />
-      </div>
+      <MainLayout>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/explore" element={<ProtectedRoute><ExplorePage /></ProtectedRoute>} />
+          <Route path="/login" element={<AuthPage type="login" />} />
+          <Route path="/register" element={<AuthPage type="register" />} />
+          <Route path="/state/:id" element={<ProtectedRoute><StatePage /></ProtectedRoute>} />
+          <Route path="/place/:id" element={<ProtectedRoute><PlacePage /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/states" element={<ProtectedRoute><StatesPage /></ProtectedRoute>} />
+          <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+        </Routes>
+      </MainLayout>
     </BrowserRouter>
   );
 }

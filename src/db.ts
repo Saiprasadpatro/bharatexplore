@@ -22,9 +22,18 @@ export function initDb() {
       name TEXT NOT NULL,
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
+      is_admin INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Migration: Add is_admin column if it doesn't exist
+  const tableInfo = db.prepare("PRAGMA table_info(users)").all();
+  const isAdminExists = tableInfo.some((col: any) => col.name === 'is_admin');
+  if (!isAdminExists) {
+    db.exec("ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0");
+    console.log("Added is_admin column to users table");
+  }
 
   // States Table
   db.exec(`
@@ -76,6 +85,45 @@ export function initDb() {
       FOREIGN KEY (place_id) REFERENCES places (id)
     )
   `);
+
+  // Blogs Table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS blogs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      content TEXT,
+      author_id INTEGER,
+      image_url TEXT,
+      category TEXT,
+      tags TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (author_id) REFERENCES users (id)
+    )
+  `);
+
+  // Site Settings Table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      label TEXT,
+      type TEXT DEFAULT 'text'
+    )
+  `);
+
+  // Initialize Settings
+  const settingCheck = db.prepare("SELECT COUNT(*) as count FROM settings").get() as { count: number };
+  if (settingCheck.count === 0) {
+    const insertSetting = db.prepare("INSERT INTO settings (key, value, label, type) VALUES (?, ?, ?, ?)");
+    insertSetting.run('site_name', 'BharatExplore', 'Site Name', 'text');
+    insertSetting.run('hero_title', 'Discover the Soul of Incredible India', 'Hero Section Title', 'text');
+    insertSetting.run('hero_subtitle', 'Curated experiences, hidden gems, and timeless heritage across the subcontinent.', 'Hero Section Subtitle', 'textarea');
+    insertSetting.run('hero_image', 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?q=80&w=2071&auto=format&fit=crop', 'Hero Background Image', 'text');
+    insertSetting.run('contact_email', 'saiprasadpatro389@gmail.com', 'Contact Email', 'text');
+    insertSetting.run('contact_phone', '+91 8018308687', 'Contact Phone', 'text');
+    insertSetting.run('meta_title', 'BharatExplore - Your Ultimate India Travel Guide', 'Meta Title (SEO)', 'text');
+    insertSetting.run('meta_description', 'Explore India like never before with handpicked destinations, local insights, and beautiful imagery.', 'Meta Description (SEO)', 'textarea');
+  }
 
   const stateCount = db.prepare('SELECT COUNT(*) as count FROM states').get() as { count: number };
   
@@ -819,10 +867,15 @@ export function initDb() {
     // Bootstrap Developer User
     const devEmail = 'saiprasadpatro389@gmail.com';
     const existingDev = db.prepare("SELECT * FROM users WHERE email = ?").get(devEmail);
+    const hashedPassword = bcrypt.hashSync('password123', 10);
+    
     if (!existingDev) {
-      const hashedPassword = bcrypt.hashSync('password123', 10);
-      db.prepare("INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)").run('Developer', devEmail, hashedPassword);
-      console.log(`Bootstrapped developer user: ${devEmail} with password: password123`);
+      db.prepare("INSERT INTO users (name, email, password_hash, is_admin) VALUES (?, ?, ?, ?)").run('Developer', devEmail, hashedPassword, 1);
+      console.log(`Bootstrapped developer user: ${devEmail} with password: password123 (Admin)`);
+    } else {
+      // FORCE RESET password and admin status to ensure the user can log in
+      db.prepare("UPDATE users SET password_hash = ?, is_admin = 1 WHERE email = ?").run(hashedPassword, devEmail);
+      console.log(`Updated existing developer user: ${devEmail} - Password reset to: password123 (Admin)`);
     }
   }
 }
